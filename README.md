@@ -2,6 +2,8 @@
 
 > Low-latency display mirroring & second-screen extension for iPad on [Omarchy](https://omarchy.org/) Linux, authenticated with **Supabase** and deployable to **Render**.
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MichaelCodeToLimit/omarchy-mirror-screen)
+
 ---
 
 ## 🌟 Overview
@@ -41,49 +43,41 @@ mirrormarch qrcode
 mirrormarch open
 ```
 
-Scan the QR code with your iPad camera or open `http://<your-ip>:4000` in Safari.
+Scan the QR code with your iPad camera or open `http://<your-pc-ip>:4000` in Safari.
 
 ---
 
 ## ☁️ Deploying to Render
 
-To access your display from anywhere via Render:
+### Option A: One-Click Deploy Button
+Click the button below to deploy directly to Render:
 
-### 1. Push to GitHub
-Create a GitHub repository for your `mirrormarch` server or fork the project:
-```bash
-cd ~/.config/omarchy/plugins/michael.mirrormarch
-git init
-git add .
-git commit -m "feat: MirrorMarch display streaming"
-git remote add origin git@github.com:YOUR_USERNAME/mirrormarch.git
-git push -u origin main
-```
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MichaelCodeToLimit/omarchy-mirror-screen)
 
-### 2. Deploy on Render
+### Option B: Manual Render Deployment
 1. Go to [dashboard.render.com](https://dashboard.render.com).
 2. Click **New +** → **Blueprint** (or **Web Service**).
-3. Connect your repository. Render will automatically detect `server/render.yaml`.
-4. Configure Environment Variables:
+3. Connect your repository: `MichaelCodeToLimit/omarchy-mirror-screen`.
+4. Render will automatically detect `render.yaml`.
+5. Set your Environment Variables:
    - `SUPABASE_URL`: Your Supabase project URL (e.g. `https://xxxx.supabase.co`)
    - `SUPABASE_ANON_KEY`: Your Supabase Anon Public Key
    - `AUTH_REQUIRED`: `true`
-5. Click **Apply** or **Deploy**.
-6. Render will generate your live URL (e.g., `https://mirrormarch.onrender.com`).
+6. Click **Apply** or **Deploy**.
+7. Render will provide your public URL (e.g., `https://omarchy-mirror-screen.onrender.com`).
 
-### 3. Connect Omarchy to your Render URL
-In Omarchy, configure your Render URL:
+### Connecting Omarchy to your Render URL
 ```bash
-mirrormarch start --render-url https://mirrormarch.onrender.com
+mirrormarch start --render-url https://omarchy-mirror-screen.onrender.com
 ```
-Or set it in the Omarchy Bar Widget settings panel!
+Or enter your Render URL into the Omarchy Bar Widget settings panel.
 
 ---
 
 ## 🔐 Supabase Configuration
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Under **Authentication** → **Users**, click **Add User** (Create User with Email & Password).
+2. Under **Authentication** → **Users**, click **Add User** (create user with Email & Password).
 3. Under **Project Settings** → **API**, copy:
    - **Project URL**
    - **anon / public key**
@@ -120,24 +114,6 @@ mirrormarch toggle
 mirrormarch status
 mirrormarch open
 mirrormarch qrcode
-```
-
----
-
-## 📄 Architecture
-
-```
-┌─────────────────┐       WebSocket Frame Stream       ┌──────────────────┐
-│  Omarchy Host   │ ─────────────────────────────────> │   Render Server  │
-│  (Hyprland PC)  │ <───────────────────────────────── │ (Relay & Static) │
-└─────────────────┘       Touch & Keystroke Input      └──────────────────┘
-   ▲                                                             ▲
-   │ /dev/uinput & grim                                          │ Supabase JWT Auth
-   │                                                             ▼
-┌──────────────────┐                                   ┌──────────────────┐
-│  Omarchy Shell   │                                   │   iPad Client    │
-│    Bar Widget    │                                   │  (Safari PWA)    │
-└──────────────────┘                                   └──────────────────┘
 ```
 
 ---

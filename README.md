@@ -2,8 +2,6 @@
 
 > High-performance display mirroring, second-screen iPad extension, and remote desktop control for [Omarchy](https://omarchy.org/) Linux on Hyprland.
 
-![MirrorMarch Preview](preview.png)
-
 ---
 
 ## 🌟 Overview

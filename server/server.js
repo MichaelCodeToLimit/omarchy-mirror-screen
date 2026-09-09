@@ -334,6 +334,14 @@ wss.on('connection', async (ws, request, pathname, url) => {
   }
 });
 
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.warn(`[MirrorMarch] Port ${PORT} already in use, relay server is already bound.`);
+  } else {
+    console.error('[MirrorMarch] Server error:', err.message);
+  }
+});
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`=========================================`);
   console.log(`  MirrorMarch Relay Server`);

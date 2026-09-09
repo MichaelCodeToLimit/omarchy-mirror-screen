@@ -107,6 +107,9 @@ stop_daemon() {
     kill -KILL "$pid" 2>/dev/null || true
   fi
 
+  pkill -f "$PLUGIN_DIR/server/server.js" 2>/dev/null || true
+  pkill -f "$PLUGIN_DIR/daemon/input_injector.py" 2>/dev/null || true
+
   rm -f "$PID_FILE"
   echo "MirrorMarch stopped."
 }

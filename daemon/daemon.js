@@ -141,14 +141,28 @@ function ensureLocalServer() {
 }
 ensureLocalServer();
 
+let relayPingInterval = null;
+
 // Connect to Relay (Local or Render)
 function connectToRelay() {
+  if (isShuttingDown) return;
+  if (relayPingInterval) {
+    clearInterval(relayPingInterval);
+    relayPingInterval = null;
+  }
+
   const wsTarget = RENDER_URL 
     ? (RENDER_URL.replace(/^http/, 'ws') + '/ws/host')
     : `ws://127.0.0.1:${PORT}/ws/host`;
 
   console.log(`[MirrorMarch] Connecting daemon to relay: ${wsTarget}`);
-  wsRelay = new WebSocket(wsTarget);
+  try {
+    wsRelay = new WebSocket(wsTarget);
+  } catch (err) {
+    console.error('[MirrorMarch] Relay instantiation error:', err.message);
+    setTimeout(connectToRelay, 2000);
+    return;
+  }
 
   wsRelay.on('open', () => {
     console.log('[MirrorMarch] Connected to WebSocket relay');
@@ -162,6 +176,13 @@ function connectToRelay() {
         quality: QUALITY
       }
     }));
+
+    // Keepalive ping every 10s to prevent cloud proxy disconnects
+    relayPingInterval = setInterval(() => {
+      if (wsRelay && wsRelay.readyState === WebSocket.OPEN) {
+        wsRelay.send(JSON.stringify({ type: 'ping', time: Date.now() }));
+      }
+    }, 10000);
   });
 
   wsRelay.on('message', (data) => {
@@ -175,8 +196,10 @@ function connectToRelay() {
         lastUser = msg.user || lastUser;
         console.log(`[MirrorMarch] Viewer joined (${msg.user || 'viewer'}). Total: ${viewersCount}`);
         writeState(true);
-        if (captureTimer) clearTimeout(captureTimer);
-        captureFrame();
+        if (!isCapturing) {
+          if (captureTimer) clearTimeout(captureTimer);
+          captureFrame();
+        }
       } else if (msg.type === 'viewer_left') {
         viewersCount = msg.count;
         console.log(`[MirrorMarch] Viewer left. Total: ${viewersCount}`);
@@ -190,15 +213,25 @@ function connectToRelay() {
     } catch (e) {}
   });
 
-  wsRelay.on('close', () => {
-    console.log('[MirrorMarch] Relay connection closed. Retrying in 2s...');
+  function handleRelayDrop() {
+    if (relayPingInterval) {
+      clearInterval(relayPingInterval);
+      relayPingInterval = null;
+    }
+    if (wsRelay) {
+      try { wsRelay.terminate(); } catch (e) {}
+      wsRelay = null;
+    }
     if (!isShuttingDown) {
+      console.log('[MirrorMarch] Relay dropped. Reconnecting in 2s...');
       setTimeout(connectToRelay, 2000);
     }
-  });
+  }
 
+  wsRelay.on('close', handleRelayDrop);
   wsRelay.on('error', (err) => {
     console.error('[MirrorMarch] Relay connection error:', err.message);
+    handleRelayDrop();
   });
 }
 
@@ -209,10 +242,15 @@ setTimeout(connectToRelay, 500);
 function captureFrame() {
   if (isShuttingDown) return;
 
-  // If no viewers are connected, capture at a slow idle rate (1 frame per 2 sec)
-  const delay = (viewersCount > 0) ? Math.max(16, Math.floor(1000 / TARGET_FPS)) : 2000;
+  // If no viewers are connected, capture at a slow idle rate (1 frame per 1.5 sec)
+  const delay = (viewersCount > 0) ? Math.max(16, Math.floor(1000 / TARGET_FPS)) : 1500;
 
-  if (viewersCount === 0 && !wsRelay) {
+  if (viewersCount === 0 && (!wsRelay || wsRelay.readyState !== WebSocket.OPEN)) {
+    captureTimer = setTimeout(captureFrame, delay);
+    return;
+  }
+
+  if (isCapturing) {
     captureTimer = setTimeout(captureFrame, delay);
     return;
   }

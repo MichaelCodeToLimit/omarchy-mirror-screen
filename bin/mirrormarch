@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+
+# omarchy:summary=Control MirrorMarch display mirroring & second-screen streaming
+# omarchy:group=plugin
+# omarchy:args=[start|stop|restart|toggle|status|open|qrcode]
+
+set -e
+
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+PLUGIN_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
+DAEMON_SCRIPT="$PLUGIN_DIR/daemon/daemon.js"
+STATE_DIR="$HOME/.local/state/omarchy"
+PID_FILE="$STATE_DIR/mirrormarch.pid"
+STATE_FILE="$STATE_DIR/mirrormarch.json"
+LOG_FILE="$STATE_DIR/mirrormarch.log"
+
+is_running() {
+  if [[ -f "$PID_FILE" ]]; then
+    local pid
+    pid=$(cat "$PID_FILE" 2>/dev/null || true)
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+get_state() {
+  local key="$1"
+  local fallback="$2"
+  if [[ -f "$STATE_FILE" ]] && command -v jq >/dev/null 2>&1; then
+    jq -r ".$key // \"$fallback\"" "$STATE_FILE" 2>/dev/null || echo "$fallback"
+  else
+    echo "$fallback"
+  fi
+}
+
+start_daemon() {
+  if is_running; then
+    local pid
+    pid=$(cat "$PID_FILE")
+    echo "MirrorMarch daemon is already running (PID: $pid)."
+    exit 0
+  fi
+
+  echo "Starting MirrorMarch daemon..."
+  mkdir -p "$STATE_DIR"
+  
+  # Run node daemon in background
+  nohup node "$DAEMON_SCRIPT" "$@" > "$LOG_FILE" 2>&1 &
+  local new_pid=$!
+  echo "$new_pid" > "$PID_FILE"
+
+  # Wait up to 3 seconds for initialization
+  for _ in {1..30}; do
+    if is_running && [[ -f "$STATE_FILE" ]]; then
+      local run_state
+      run_state=$(get_state "running" "false")
+      if [[ "$run_state" == "true" ]]; then
+        break
+      fi
+    fi
+    sleep 0.1
+  done
+
+  echo "MirrorMarch started successfully."
+  print_status
+}
+
+stop_daemon() {
+  if ! is_running; then
+    echo "MirrorMarch is not running."
+    # Clean up stale files if any
+    rm -f "$PID_FILE"
+    if [[ -f "$STATE_FILE" ]] && command -v jq >/dev/null 2>&1; then
+      jq '.running = false' "$STATE_FILE" > "$STATE_FILE.tmp" 2>/dev/null && mv "$STATE_FILE.tmp" "$STATE_FILE" || true
+    fi
+    exit 0
+  fi
+
+  local pid
+  pid=$(cat "$PID_FILE")
+  echo "Stopping MirrorMarch daemon (PID: $pid)..."
+  kill -TERM "$pid" 2>/dev/null || true
+
+  # Wait for clean exit
+  for _ in {1..20}; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      break
+    fi
+    sleep 0.1
+  done
+
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -KILL "$pid" 2>/dev/null || true
+  fi
+
+  rm -f "$PID_FILE"
+  echo "MirrorMarch stopped."
+}
+
+toggle_daemon() {
+  if is_running; then
+    stop_daemon
+  else
+    start_daemon "$@"
+  fi
+}
+
+print_status() {
+  if is_running; then
+    local pid mode output fps viewers localUrl renderUrl
+    pid=$(cat "$PID_FILE")
+    mode=$(get_state "mode" "mirror")
+    output=$(get_state "output" "DP-1")
+    fps=$(get_state "fps" "0")
+    viewers=$(get_state "viewersCount" "0")
+    localUrl=$(get_state "localUrl" "http://localhost:4000")
+    renderUrl=$(get_state "renderUrl" "")
+
+    echo "=========================================="
+    echo "  MirrorMarch Status: RUNNING"
+    echo "  PID:          $pid"
+    echo "  Mode:         $mode"
+    echo "  Output:       $output"
+    echo "  Live FPS:     $fps"
+    echo "  Viewers:      $viewers"
+    echo "  Local URL:    $localUrl"
+    if [[ -n "$renderUrl" ]]; then
+      echo "  Render URL:   $renderUrl"
+    fi
+    echo "=========================================="
+  else
+    echo "MirrorMarch Status: STOPPED"
+  fi
+}
+
+open_viewer() {
+  local url
+  url=$(get_state "renderUrl" "")
+  if [[ -z "$url" ]]; then
+    url=$(get_state "localUrl" "http://localhost:4000")
+  fi
+  echo "Opening $url in browser..."
+  xdg-open "$url" 2>/dev/null || true
+}
+
+show_qrcode() {
+  local url
+  url=$(get_state "renderUrl" "")
+  if [[ -z "$url" ]]; then
+    url=$(get_state "localUrl" "http://localhost:4000")
+  fi
+  echo ""
+  echo "Scan with iPad Camera to connect to MirrorMarch:"
+  echo "$url"
+  echo ""
+  if command -v qrencode >/dev/null 2>&1; then
+    qrencode -t ANSIUTF8 "$url"
+  else
+    echo "(qrencode not installed)"
+  fi
+  echo ""
+}
+
+CMD="${1:-status}"
+shift || true
+
+case "$CMD" in
+  start)
+    start_daemon "$@"
+    ;;
+  stop)
+    stop_daemon
+    ;;
+  restart)
+    stop_daemon || true
+    sleep 0.5
+    start_daemon "$@"
+    ;;
+  toggle)
+    toggle_daemon "$@"
+    ;;
+  status)
+    print_status
+    ;;
+  open)
+    open_viewer
+    ;;
+  qrcode|qr)
+    show_qrcode
+    ;;
+  *)
+    echo "Usage: mirrormarch {start|stop|restart|toggle|status|open|qrcode} [options]"
+    exit 1
+    ;;
+esac

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "id": "michael.mirrormarch",
+  "name": "MirrorMarch",
+  "version": "1.0.0",
+  "author": "Michael Davies",
+  "license": "MIT",
+  "description": "Display mirroring and second-screen extension for iPad with Supabase authentication and Render hosting.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "MirrorMarch",
+    "description": "Mirror or extend your display to an iPad or external browser with Supabase authentication.",
+    "category": "Display",
+    "defaultSection": "right",
+    "allowMultiple": false,
+    "defaults": {
+      "mode": "mirror",
+      "fps": 30,
+      "quality": 65,
+      "port": 4000,
+      "renderUrl": ""
+    },
+    "schema": [
+      {
+        "key": "mode",
+        "type": "enum",
+        "label": "Display Mode",
+        "description": "Mirror active display or extend as a separate virtual monitor.",
+        "options": [
+          "mirror",
+          "extend"
+        ],
+        "defaultValue": "mirror"
+      },
+      {
+        "key": "fps",
+        "type": "integer",
+        "label": "Target Frame Rate (FPS)",
+        "description": "Frame rate target for display streaming.",
+        "min": 15,
+        "max": 60,
+        "step": 5,
+        "defaultValue": 30
+      },
+      {
+        "key": "quality",
+        "type": "integer",
+        "label": "Stream Quality (%)",
+        "description": "JPEG compression quality level.",
+        "min": 40,
+        "max": 90,
+        "step": 5,
+        "defaultValue": 65
+      },
+      {
+        "key": "renderUrl",
+        "type": "string",
+        "label": "Render Relay URL",
+        "description": "Public URL where your MirrorMarch web service is hosted on Render.",
+        "defaultValue": ""
+      }
+    ]
+  }
+}

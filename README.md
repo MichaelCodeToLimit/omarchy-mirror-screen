@@ -50,20 +50,39 @@ Whether you need extra screen real estate on the go, want to mirror your desktop
 
 ---
 
-## 📦 Installation
+## 📦 Installation & Removal
 
+### Installation
 Install MirrorMarch directly through the Omarchy plugin manager:
 
 ```bash
 omarchy plugin add https://github.com/MichaelCodeToLimit/omarchy-mirror-screen.git --enable
 ```
 
-Or clone into your plugins directory:
+Or clone manually:
 
 ```bash
 git clone https://github.com/MichaelCodeToLimit/omarchy-mirror-screen.git ~/.config/omarchy/plugins/michael.mirrormarch
 omarchy plugin enable michael.mirrormarch
 ```
+
+### Removal / Uninstallation
+To disable or completely remove MirrorMarch:
+
+```bash
+# Disable without deleting
+omarchy plugin disable michael.mirrormarch
+
+# Completely remove
+omarchy plugin remove michael.mirrormarch
+```
+
+### Dependencies
+MirrorMarch relies on tools standard on Omarchy:
+- **`grim`**: High-performance Wayland image capture utility.
+- **`wtype`**: Wayland virtual keyboard and shortcut input simulation.
+- **`hyprland` / `hyprctl`**: Wayland compositor control and virtual headless monitor creation.
+- **`node`** (v18+) & **`python3`**: Runtime engines for the local background service and input injector.
 
 ---
 

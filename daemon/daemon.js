@@ -18,6 +18,7 @@ function hasArg(flag) {
 const MODE = getArg('--mode', 'mirror'); // 'mirror' or 'extend'
 const TARGET_FPS = parseInt(getArg('--fps', '30'), 10);
 const QUALITY = parseInt(getArg('--quality', '65'), 10);
+const PORT = parseInt(getArg('--port', '4000'), 10);
 const RENDER_URL = getArg('--render-url', process.env.MIRRORMARCH_RENDER_URL || 'https://mirrormarch.onrender.com');
 const VIRTUAL_RES = getArg('--virtual-res', '2048x1536'); // iPad Retina default
 let TARGET_OUTPUT = getArg('--output', '');

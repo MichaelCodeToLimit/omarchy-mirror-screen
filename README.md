@@ -1,123 +1,138 @@
 # MirrorMarch 󰐱
 
-> Low-latency display mirroring & second-screen extension for iPad on [Omarchy](https://omarchy.org/) Linux, authenticated with **Supabase** and deployable to **Render**.
+> High-performance display mirroring, second-screen iPad extension, and remote desktop control for [Omarchy](https://omarchy.org/) Linux on Hyprland.
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MichaelCodeToLimit/omarchy-mirror-screen)
+![MirrorMarch Preview](preview.png)
 
 ---
 
 ## 🌟 Overview
 
-**MirrorMarch** turns your iPad, tablet, or browser into an interactive second display or mirror of your Omarchy Hyprland desktop:
+**MirrorMarch** is an official-style Omarchy bar plugin and background service that turns your iPad, tablet, phone, or any modern web browser into a wireless second monitor or interactive remote desktop for your Linux machine.
 
-- **🔐 Supabase Authentication**: Secure user login ensuring only authorized devices can stream your screen.
-- **☁️ Render Ready**: Out-of-the-box support for deploying as a web service on Render with `render.yaml` and `Dockerfile`.
-- **⚡ Ultra Low Latency**: 30–60 FPS display streaming over WebSockets with GPU-accelerated canvas decoding (`createImageBitmap`).
-- **📱 Native iPad Touch & Gestures**:
-  - Direct Touch: Tap to click, press-and-hold for right-click, drag to move.
-  - Trackpad Mode: Smooth relative cursor navigation.
-  - Virtual Keyboard: Tap to bring up the native iOS iPad on-screen keyboard to type into any Linux application.
-  - Two-finger scrolling and zooming.
-- **🖥️ Two Display Modes**:
-  - **Mirror Mode**: Replicates your main monitor (`DP-1`) in real-time.
-  - **Extend Mode**: Creates a dedicated virtual headless display (`HEADLESS-1`) matching your iPad's exact resolution, providing a true separate workspace.
-- **🎨 Omarchy Bar Widget**: Status bar icon showing live status, FPS counter, connected clients badge, and a popup panel with mode switching and camera-scannable QR code.
+Whether you need extra screen real estate on the go, want to mirror your desktop for presentations, or want full touch-friendly remote control of your Omarchy workspace from across the room, MirrorMarch delivers ultra low-latency streaming and full input injection.
 
 ---
 
-## 🚀 Quick Start (Local Wi-Fi / Direct)
+## ✨ Features
 
-You can use MirrorMarch immediately on your local Wi-Fi or Tailscale network without waiting for cloud deployment:
+### 🖥️ Three Operating Modes
+- **󰍹 Mirror Mode**: Clones your active primary display (`DP-1` / `eDP-1`) in real-time with zero configuration.
+- **󰐱 Extend Mode**: Dynamically provisions a virtual headless display (`HEADLESS-1`) configured to your tablet's exact native resolution, providing a true separate workspace for multitasking.
+- **󰢹 Remote Desktop Mode**: Full interactive control over your Omarchy desktop with specialized on-screen controls, virtual key combos, and touch gestures.
+
+### 📱 Touch-First Mobile & Tablet Experience
+- **Direct Touch & Trackpad**: Switch between direct tap-to-click / drag and smooth laptop-style trackpad navigation.
+- **Remote Desktop Toolbar**:
+  - **Quick Hyprland Shortcuts**: One-tap triggers for App Launcher (`Super+Space`), Terminal (`Super+Return`), and Close Window (`Super+W`).
+  - **Latched Modifiers**: Sticky on-screen modifier keys (`Super`, `Ctrl`, `Alt`, `Shift`) to execute complex window manager key combinations.
+  - **Window Drag & Select**: Dedicated Drag Mode button to easily move tiled/floating windows and select text.
+  - **Quick Keys**: On-screen Tab and Escape keys for quick terminal navigation.
+  - **Clipboard Paste**: Send text or clipboard contents straight to the active Linux application.
+- **Touch Ripple Feedback**: Real-time visual ripples on screen touches.
+- **Always-On Display**: Uses the Screen Wake Lock API to prevent mobile displays from dimming or locking during a session.
+- **Virtual Keyboard**: Tap to summon your device's native on-screen keyboard to type into any Linux terminal or editor.
+
+### ⚡ Tunable Performance & Low Latency
+- **Real-time Streaming**: Powered by WebSockets and high-throughput hardware capture.
+- **Dynamic Quality Switching**: Toggle between `Speed` (45% quality, 40 FPS), `Balanced` (65% quality, 30 FPS), and `HQ` (85% quality, 20 FPS) presets on the fly directly from the viewer HUD.
+- **Hardware-Accelerated Canvas**: Uses `createImageBitmap` on an HTML5 canvas for smooth 30–60 FPS output.
+
+### 🎨 Native Omarchy Bar Widget (`Widget.qml`)
+- **Status Bar Indicator**: Live glyph showing connection status, active mode, and real-time FPS counter.
+- **One-Click Fast Toggle**: Right-click the bar icon to instantly start or stop streaming.
+- **Interactive Popup**: Left-click to reveal the control panel with mode selectors, settings, and a scannable QR code.
+- **Keyboard Shortcuts**: Navigate the widget popup with `Space` (toggle), `M` (mirror), `E` (extend), `R` (remote), `O` (open viewer), or `Esc` (dismiss).
+
+### 🔐 Built-in Authentication
+- Secure authentication system protecting your display stream.
+- Seamless sign-up and sign-in directly within the web interface without email verification friction.
+
+---
+
+## 📦 Installation
+
+Install MirrorMarch directly through the Omarchy plugin manager:
 
 ```bash
-# Start mirroring primary display
-mirrormarch start --mode mirror
-
-# Or extend to a virtual second display for iPad
-mirrormarch start --mode extend
-
-# Show iPad camera QR code
-mirrormarch qrcode
-
-# Open in local browser
-mirrormarch open
+omarchy plugin add https://github.com/MichaelCodeToLimit/omarchy-mirror-screen.git --enable
 ```
 
-Scan the QR code with your iPad camera or open `http://<your-pc-ip>:4000` in Safari.
+Or clone into your plugins directory:
 
----
-
-## ☁️ Deploying to Render
-
-### Option A: One-Click Deploy Button
-Click the button below to deploy directly to Render:
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MichaelCodeToLimit/omarchy-mirror-screen)
-
-### Option B: Manual Render Deployment
-1. Go to [dashboard.render.com](https://dashboard.render.com).
-2. Click **New +** → **Blueprint** (or **Web Service**).
-3. Connect your repository: `MichaelCodeToLimit/omarchy-mirror-screen`.
-4. Render will automatically detect `render.yaml`.
-5. Set your Environment Variables:
-   - `SUPABASE_URL`: Your Supabase project URL (e.g. `https://xxxx.supabase.co`)
-   - `SUPABASE_ANON_KEY`: Your Supabase Anon Public Key
-   - `AUTH_REQUIRED`: `true`
-6. Click **Apply** or **Deploy**.
-7. Render will provide your public URL (e.g., `https://omarchy-mirror-screen.onrender.com`).
-
-### Connecting Omarchy to your Render URL
 ```bash
-mirrormarch start --render-url https://omarchy-mirror-screen.onrender.com
+git clone https://github.com/MichaelCodeToLimit/omarchy-mirror-screen.git ~/.config/omarchy/plugins/michael.mirrormarch
+omarchy plugin enable michael.mirrormarch
 ```
-Or enter your Render URL into the Omarchy Bar Widget settings panel.
 
 ---
 
-## 🔐 Supabase Configuration
+## 🚀 Getting Started
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. Under **Authentication** → **Users**, click **Add User** (create user with Email & Password).
-3. Under **Project Settings** → **API**, copy:
-   - **Project URL**
-   - **anon / public key**
-4. Paste them into Render's Environment Variables, or enter them directly into the MirrorMarch login page settings on your iPad!
+1. **Start Streaming**:
+   Click the MirrorMarch icon in your Omarchy bar and press **Start Streaming**, or use the CLI:
+   ```bash
+   # Mirror primary monitor
+   mirrormarch start --mode mirror
 
----
+   # Extend as a second iPad screen
+   mirrormarch start --mode extend
 
-## 🎛️ Omarchy Bar Widget
+   # Interactive remote desktop
+   mirrormarch start --mode remote
+   ```
 
-The MirrorMarch bar widget appears automatically in your Omarchy status bar:
-
-- **Dimmed Icon (`󰐱 Mirror`)**: Stopped.
-- **Amber Icon (`󰐱 Ready`)**: Server online, waiting for iPad to connect.
-- **Green Icon (`󰐱 30 FPS`)**: Active stream connected to iPad!
-
-### Widget Controls:
-- **Left-Click**: Opens the control panel.
-- **Right-Click**: Fast one-click toggle (starts/stops mirroring).
-- **In Panel**:
-  - `Space` or `S`: Toggle streaming
-  - `M`: Switch to Mirror mode
-  - `E`: Switch to Extend (virtual headless monitor) mode
-  - `O`: Open web viewer in browser
-  - `Q` or `Esc`: Dismiss panel
+2. **Connect Your Device**:
+   - Open the MirrorMarch widget popup to view your device connection QR code.
+   - Scan the QR code with your iPad or phone camera to open the web viewer.
+   - Sign in or create an account, and your screen will appear immediately!
 
 ---
 
-## 💻 CLI Reference
+## 💻 CLI Commands
+
+MirrorMarch includes a full CLI utility:
 
 ```bash
-mirrormarch start [--mode mirror|extend] [--fps 30] [--quality 65] [--render-url URL]
+# Start background daemon
+mirrormarch start [--mode mirror|extend|remote] [--fps 30] [--quality 65]
+
+# Stop streaming and clean up virtual displays
 mirrormarch stop
+
+# Toggle streaming state on/off
 mirrormarch toggle
+
+# Switch directly to Remote Desktop mode
+mirrormarch remote
+
+# Check daemon status and active configuration
 mirrormarch status
-mirrormarch open
+
+# Display connection QR code in terminal
 mirrormarch qrcode
+
+# Open viewer in your default web browser
+mirrormarch open
 ```
+
+---
+
+## ⌨️ Widget Keyboard Shortcuts
+
+When the Omarchy bar popup widget is focused:
+
+| Key | Action |
+| :--- | :--- |
+| `Space` / `S` | Toggle streaming on/off |
+| `M` | Switch to Mirror mode |
+| `E` | Switch to Extend (virtual monitor) mode |
+| `R` | Switch to Remote Desktop mode |
+| `O` | Open viewer in local browser |
+| `Q` / `Esc` | Close widget popup |
 
 ---
 
 ## 📜 License
 
-MIT © Michael Davies
+MIT License © 2026 Michael Davies

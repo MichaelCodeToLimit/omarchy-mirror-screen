@@ -33,6 +33,7 @@ BarWidget {
 
   readonly property string displayGlyph: "󰐱"
   readonly property string monitorGlyph: "󰍹"
+  readonly property string remoteGlyph: "󰢹"
 
   // Sizing for bar slot
   implicitWidth: button.implicitWidth
@@ -50,15 +51,17 @@ BarWidget {
   // ------------------------------------------------------------- bar label
 
   readonly property string barLabel: {
-    if (!store.running) return displayGlyph + " Mirror"
-    if (store.viewersCount > 0) return displayGlyph + " " + store.fps + " FPS"
-    return displayGlyph + " Ready"
+    var glyph = root.selectedMode === "remote-desktop" ? remoteGlyph : (root.selectedMode === "extend" ? displayGlyph : monitorGlyph)
+    if (!store.running) return glyph + " " + (root.selectedMode === "remote-desktop" ? "Remote" : (root.selectedMode === "extend" ? "Extend" : "Mirror"))
+    if (store.viewersCount > 0) return glyph + " " + store.fps + " FPS"
+    return glyph + " " + (root.selectedMode === "remote-desktop" ? "Remote" : "Ready")
   }
 
   readonly property string tooltipInfo: {
-    if (!store.running) return "MirrorMarch: Stopped (click to start)"
-    if (store.viewersCount > 0) return "MirrorMarch: Streaming to " + store.viewersCount + " device(s) (" + store.fps + " FPS)"
-    return "MirrorMarch: Ready for iPad (" + (store.renderUrl || store.localUrl) + ")"
+    var modeName = root.selectedMode === "remote-desktop" ? "Remote Desktop" : (root.selectedMode === "extend" ? "Extend Display" : "Screen Mirror")
+    if (!store.running) return "MirrorMarch (" + modeName + "): Stopped (click to start)"
+    if (store.viewersCount > 0) return "MirrorMarch (" + modeName + "): Streaming to " + store.viewersCount + " device(s) (" + store.fps + " FPS)"
+    return "MirrorMarch (" + modeName + "): Ready (" + (store.renderUrl || store.localUrl) + ")"
   }
 
   function open() {
@@ -95,6 +98,10 @@ BarWidget {
     function extend(): void {
       root.selectedMode = "extend"
       if (store.running) store.start("extend", root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
+    }
+    function remote(): void {
+      root.selectedMode = "remote-desktop"
+      if (store.running) store.start("remote-desktop", root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
     }
     function openPanel(): void { root.open() }
     function closePanel(): void { root.close() }
@@ -156,8 +163,18 @@ BarWidget {
         var key = String(text || "").toLowerCase()
         if (key === "q" || key === "escape") root.close()
         else if (key === " " || key === "s") store.toggle(root.selectedMode, root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
-        else if (key === "m") root.selectedMode = "mirror"
-        else if (key === "e") root.selectedMode = "extend"
+        else if (key === "m") {
+          root.selectedMode = "mirror"
+          if (store.running) store.start("mirror", root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
+        }
+        else if (key === "e") {
+          root.selectedMode = "extend"
+          if (store.running) store.start("extend", root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
+        }
+        else if (key === "r") {
+          root.selectedMode = "remote-desktop"
+          if (store.running) store.start("remote-desktop", root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
+        }
         else if (key === "o") store.openBrowser(store.renderUrl || store.localUrl)
       }
 
@@ -275,12 +292,12 @@ BarWidget {
 
           Row {
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Style.space(6)
 
             Button {
-              width: (parent.width - Style.space(8)) / 2
+              width: (parent.width - Style.space(12)) / 3
               height: Style.space(32)
-              text: "󰍹 Mirror (DP-1)"
+              text: "󰍹 Mirror"
               selected: root.selectedMode === "mirror"
               fontFamily: root.fontFamily
               fontSize: Style.font.bodySmall
@@ -291,15 +308,28 @@ BarWidget {
             }
 
             Button {
-              width: (parent.width - Style.space(8)) / 2
+              width: (parent.width - Style.space(12)) / 3
               height: Style.space(32)
-              text: "󰐱 Extend (Virtual)"
+              text: "󰐱 Extend"
               selected: root.selectedMode === "extend"
               fontFamily: root.fontFamily
               fontSize: Style.font.bodySmall
               onClicked: {
                 root.selectedMode = "extend"
                 if (store.running) store.start("extend", root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
+              }
+            }
+
+            Button {
+              width: (parent.width - Style.space(12)) / 3
+              height: Style.space(32)
+              text: "󰢹 Remote"
+              selected: root.selectedMode === "remote-desktop"
+              fontFamily: root.fontFamily
+              fontSize: Style.font.bodySmall
+              onClicked: {
+                root.selectedMode = "remote-desktop"
+                if (store.running) store.start("remote-desktop", root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
               }
             }
           }
@@ -403,7 +433,7 @@ BarWidget {
           spacing: Style.space(10)
 
           Text {
-            text: "Space: Toggle • M: Mirror • E: Extend • Q: Close"
+            text: "Space: Toggle • M: Mirror • E: Extend • R: Remote • Q: Close"
             color: root.faint
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

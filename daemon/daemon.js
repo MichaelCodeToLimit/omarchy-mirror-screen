@@ -15,9 +15,9 @@ function hasArg(flag) {
   return args.includes(flag);
 }
 
-const MODE = getArg('--mode', 'mirror'); // 'mirror' or 'extend'
-const TARGET_FPS = parseInt(getArg('--fps', '30'), 10);
-const QUALITY = parseInt(getArg('--quality', '65'), 10);
+let MODE = getArg('--mode', 'mirror'); // 'mirror', 'extend', or 'remote-desktop'
+let TARGET_FPS = parseInt(getArg('--fps', '30'), 10);
+let QUALITY = parseInt(getArg('--quality', '65'), 10);
 const PORT = parseInt(getArg('--port', '4000'), 10);
 const RENDER_URL = getArg('--render-url', process.env.MIRRORMARCH_RENDER_URL || 'https://mirrormarch.onrender.com');
 const VIRTUAL_RES = getArg('--virtual-res', '2048x1536'); // iPad Retina default
@@ -209,6 +209,11 @@ function connectToRelay() {
         if (inputInjector && inputInjector.stdin.writable) {
           inputInjector.stdin.write(JSON.stringify(msg) + '\n');
         }
+      } else if (msg.type === 'tune') {
+        if (msg.quality) QUALITY = Math.max(20, Math.min(95, parseInt(msg.quality, 10)));
+        if (msg.fps) TARGET_FPS = Math.max(10, Math.min(60, parseInt(msg.fps, 10)));
+        console.log(`[MirrorMarch] Dynamically tuned: Quality=${QUALITY}%, FPS=${TARGET_FPS}`);
+        writeState(true);
       }
     } catch (e) {}
   });

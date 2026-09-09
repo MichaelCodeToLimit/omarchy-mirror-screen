@@ -30,6 +30,17 @@
   const iconFsExit = document.getElementById('icon-fs-exit');
   const btnLogout = document.getElementById('btn-logout');
 
+  // Remote Desktop UI Elements
+  const remoteToolbar = document.getElementById('remote-toolbar');
+  const tbPullHandle = document.getElementById('tb-pull-handle');
+  const btnMouseRight = document.getElementById('btn-mouse-right');
+  const btnDragMode = document.getElementById('btn-drag-mode');
+  const btnPaste = document.getElementById('btn-paste-clipboard');
+  const btnQualityToggle = document.getElementById('btn-quality-toggle');
+  const qualityText = document.getElementById('quality-text');
+  const hudModeBadge = document.getElementById('hud-mode-badge');
+  const rippleLayer = document.getElementById('touch-ripple-layer');
+
   // App State
   let supabase = null;
   let serverConfig = null;
@@ -38,7 +49,11 @@
   let authMode = 'signin'; // 'signin' or 'signup'
   let hostConnected = false;
   let touchMode = 'direct'; // 'direct' or 'trackpad'
-  let streamMeta = { width: 1920, height: 1080, mode: 'mirror' };
+  let streamMeta = { width: 1920, height: 1080, mode: 'remote-desktop' };
+  let activeModifiers = new Set();
+  let dragModeEnabled = false;
+  let currentQualityPreset = 'balanced';
+  let wakeLock = null;
   
   // Stats
   let fps = 0;
@@ -262,13 +277,16 @@
   });
 
   // Switch to Viewer View & connect WebSocket
-  function startViewer() {
+  async function startViewer() {
     authView.classList.add('hidden');
     viewerView.classList.remove('hidden');
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
+    setupRemoteToolbar();
+    await requestWakeLock();
     connectWebSocket();
     startHudTimer();
+    updateModeBadge();
   }
 
   function resizeCanvas() {
@@ -350,6 +368,7 @@
       }
       if (msg.meta) {
         streamMeta = { ...streamMeta, ...msg.meta };
+        updateModeBadge();
       }
     } else if (msg.type === 'host_connected') {
       hostConnected = true;
@@ -357,6 +376,7 @@
       displayOverlay.classList.add('hidden');
       if (msg.meta) {
         streamMeta = { ...streamMeta, ...msg.meta };
+        updateModeBadge();
       }
     } else if (msg.type === 'host_disconnected') {
       hostConnected = false;
@@ -366,11 +386,30 @@
       displayOverlay.classList.remove('hidden');
     } else if (msg.type === 'meta') {
       streamMeta = { ...streamMeta, ...msg.meta };
+      updateModeBadge();
     } else if (msg.type === 'pong') {
       latencyMs = Math.round(performance.now() - msg.time);
       updateStats();
     } else if (msg.type === 'auth_required') {
       logout();
+    }
+  }
+
+  function updateModeBadge() {
+    if (!hudModeBadge) return;
+    const mode = streamMeta?.mode || 'remote-desktop';
+    if (mode === 'remote-desktop') {
+      hudModeBadge.textContent = 'Remote';
+      hudModeBadge.style.color = '#38bdf8';
+      hudModeBadge.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+    } else if (mode === 'extend') {
+      hudModeBadge.textContent = 'Extend';
+      hudModeBadge.style.color = '#a855f7';
+      hudModeBadge.style.borderColor = 'rgba(168, 85, 247, 0.3)';
+    } else {
+      hudModeBadge.textContent = 'Mirror';
+      hudModeBadge.style.color = '#34d399';
+      hudModeBadge.style.borderColor = 'rgba(52, 211, 153, 0.3)';
     }
   }
 
@@ -470,6 +509,39 @@
     }
   }
 
+  // Visual Touch Ripple Feedback
+  function createTouchRipple(clientX, clientY) {
+    if (!rippleLayer) return;
+    const ripple = document.createElement('div');
+    ripple.className = 'touch-ripple';
+    ripple.style.left = `${clientX - 18}px`;
+    ripple.style.top = `${clientY - 18}px`;
+    rippleLayer.appendChild(ripple);
+    setTimeout(() => {
+      ripple.remove();
+    }, 450);
+  }
+
+  // Keep screen awake (Wake Lock API)
+  async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+          wakeLock = null;
+        });
+      } catch (err) {
+        console.warn('[MirrorMarch] Wake Lock error:', err);
+      }
+    }
+  }
+
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && !viewerView.classList.contains('hidden')) {
+      await requestWakeLock();
+    }
+  });
+
   // Pointer / Touch Events
   canvas.addEventListener('pointerdown', (e) => {
     isPointerDown = true;
@@ -479,15 +551,25 @@
     touchMoved = false;
 
     showHudTemporarily();
+    createTouchRipple(e.clientX, e.clientY);
+
+    const coords = getNormalizedCoordinates(e.clientX, e.clientY);
+
+    if (dragModeEnabled) {
+      if (coords) {
+        sendInput({ action: 'mouse_down', button: 'left', x: coords.x, y: coords.y });
+      }
+      return;
+    }
 
     if (touchMode === 'direct') {
-      const coords = getNormalizedCoordinates(e.clientX, e.clientY);
       if (coords) {
         sendInput({ action: 'move', x: coords.x, y: coords.y });
         
         longPressTimer = setTimeout(() => {
           if (!touchMoved && isPointerDown) {
             sendInput({ action: 'click', button: 'right', x: coords.x, y: coords.y });
+            createTouchRipple(e.clientX, e.clientY);
             longPressTimer = null;
           }
         }, 450);
@@ -507,7 +589,7 @@
       }
     }
 
-    if (touchMode === 'direct') {
+    if (touchMode === 'direct' || dragModeEnabled) {
       const coords = getNormalizedCoordinates(e.clientX, e.clientY);
       if (coords) {
         sendInput({ action: 'move', x: coords.x, y: coords.y });
@@ -528,11 +610,19 @@
       longPressTimer = null;
     }
 
+    const coords = getNormalizedCoordinates(e.clientX, e.clientY);
+
+    if (dragModeEnabled) {
+      if (coords) {
+        sendInput({ action: 'mouse_up', button: 'left', x: coords.x, y: coords.y });
+      }
+      return;
+    }
+
     const duration = performance.now() - touchStartTime;
 
     if (!touchMoved && duration < 350) {
       if (touchMode === 'direct') {
-        const coords = getNormalizedCoordinates(e.clientX, e.clientY);
         if (coords) {
           sendInput({ action: 'click', button: 'left', x: coords.x, y: coords.y });
         }
@@ -547,6 +637,144 @@
     sendInput({ action: 'scroll', dx: e.deltaX, dy: e.deltaY });
   }, { passive: false });
 
+  // Remote Desktop Toolbar Wiring
+  let toolbarInitialized = false;
+  function setupRemoteToolbar() {
+    if (toolbarInitialized || !remoteToolbar) return;
+    toolbarInitialized = true;
+
+    // Pull handle minimize toggle
+    if (tbPullHandle) {
+      tbPullHandle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        remoteToolbar.classList.toggle('minimized');
+      });
+    }
+
+    // Modifier buttons latching
+    const modButtons = remoteToolbar.querySelectorAll('.tb-btn-mod');
+    modButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mod = btn.getAttribute('data-mod');
+        if (activeModifiers.has(mod)) {
+          activeModifiers.delete(mod);
+          btn.classList.remove('active');
+        } else {
+          activeModifiers.add(mod);
+          btn.classList.add('active');
+        }
+      });
+    });
+
+    function clearModifiers() {
+      activeModifiers.clear();
+      modButtons.forEach(b => b.classList.remove('active'));
+    }
+
+    // Quick Action shortcuts
+    const actionButtons = remoteToolbar.querySelectorAll('[data-shortcut]');
+    actionButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const shortcut = btn.getAttribute('data-shortcut');
+        if (shortcut === 'launcher') {
+          // Omarchy Menu: Super + Space
+          sendInput({ action: 'key_combination', modifiers: ['super'], key: 'space' });
+        } else if (shortcut === 'terminal') {
+          // Terminal: Super + Return
+          sendInput({ action: 'key_combination', modifiers: ['super'], key: 'Return' });
+        } else if (shortcut === 'close') {
+          // Close Window: Super + W
+          sendInput({ action: 'key_combination', modifiers: ['super'], key: 'w' });
+        }
+      });
+    });
+
+    // Special Keys (Tab, Escape)
+    const keyButtons = remoteToolbar.querySelectorAll('[data-key]');
+    keyButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const key = btn.getAttribute('data-key');
+        if (activeModifiers.size > 0) {
+          sendInput({
+            action: 'key_combination',
+            modifiers: Array.from(activeModifiers),
+            key: key
+          });
+          clearModifiers();
+        } else {
+          sendInput({ action: 'key_press', key: key });
+        }
+      });
+    });
+
+    // Right Click Button
+    if (btnMouseRight) {
+      btnMouseRight.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sendInput({ action: 'click', button: 'right' });
+        createTouchRipple(window.innerWidth / 2, window.innerHeight / 2);
+      });
+    }
+
+    // Drag Mode Toggle Button
+    if (btnDragMode) {
+      btnDragMode.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dragModeEnabled = !dragModeEnabled;
+        btnDragMode.classList.toggle('active', dragModeEnabled);
+        btnDragMode.textContent = dragModeEnabled ? 'Drag Mode: ON' : 'Drag Mode: OFF';
+      });
+    }
+
+    // Paste text button
+    if (btnPaste) {
+      btnPaste.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            const text = await navigator.clipboard.readText();
+            if (text) {
+              sendInput({ action: 'type_text', text });
+              return;
+            }
+          }
+        } catch (err) {}
+        const text = prompt('Enter text to type on Omarchy PC:');
+        if (text) {
+          sendInput({ action: 'type_text', text });
+        }
+      });
+    }
+
+    // Stream Performance / Quality preset switcher
+    if (btnQualityToggle) {
+      const presets = [
+        { name: 'balanced', label: 'Balanced', quality: 65, fps: 30 },
+        { name: 'hq', label: 'HQ', quality: 85, fps: 20 },
+        { name: 'speed', label: 'Speed', quality: 45, fps: 40 }
+      ];
+      let presetIndex = 0;
+
+      btnQualityToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        presetIndex = (presetIndex + 1) % presets.length;
+        const p = presets[presetIndex];
+        currentQualityPreset = p.name;
+        if (qualityText) qualityText.textContent = p.label;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'tune',
+            quality: p.quality,
+            fps: p.fps
+          }));
+        }
+      });
+    }
+  }
+
   btnKeyboard.addEventListener('click', (e) => {
     e.stopPropagation();
     virtualInput.focus();
@@ -554,7 +782,17 @@
 
   virtualInput.addEventListener('keydown', (e) => {
     if (e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Escape' || e.key === 'Tab') {
-      sendInput({ action: 'key_press', key: e.key });
+      if (activeModifiers.size > 0) {
+        sendInput({
+          action: 'key_combination',
+          modifiers: Array.from(activeModifiers),
+          key: e.key
+        });
+        activeModifiers.clear();
+        document.querySelectorAll('.tb-btn-mod').forEach(b => b.classList.remove('active'));
+      } else {
+        sendInput({ action: 'key_press', key: e.key });
+      }
     }
   });
 

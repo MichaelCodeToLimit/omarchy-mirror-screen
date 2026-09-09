@@ -113,7 +113,7 @@ def main():
                     syn(fd)
 
             elif action == "click":
-                btn = BTN_LEFT if msg.get("button") == "left" else BTN_RIGHT
+                btn = BTN_LEFT if msg.get("button") == "left" else (BTN_RIGHT if msg.get("button") == "right" else BTN_MIDDLE)
                 if "x" in msg and "y" in msg:
                     x = float(msg.get("x", 0.0))
                     y = float(msg.get("y", 0.0))
@@ -125,6 +125,32 @@ def main():
                 emit_event(fd, EV_KEY, btn, 1)
                 syn(fd)
                 time.sleep(0.02)
+                emit_event(fd, EV_KEY, btn, 0)
+                syn(fd)
+
+            elif action == "mouse_down":
+                btn = BTN_LEFT if msg.get("button", "left") == "left" else (BTN_RIGHT if msg.get("button") == "right" else BTN_MIDDLE)
+                if "x" in msg and "y" in msg:
+                    x = float(msg.get("x", 0.0))
+                    y = float(msg.get("y", 0.0))
+                    abs_x_val = int(max(0.0, min(1.0, x)) * MAX_ABS)
+                    abs_y_val = int(max(0.0, min(1.0, y)) * MAX_ABS)
+                    emit_event(fd, EV_ABS, ABS_X, abs_x_val)
+                    emit_event(fd, EV_ABS, ABS_Y, abs_y_val)
+                    syn(fd)
+                emit_event(fd, EV_KEY, btn, 1)
+                syn(fd)
+
+            elif action == "mouse_up":
+                btn = BTN_LEFT if msg.get("button", "left") == "left" else (BTN_RIGHT if msg.get("button") == "right" else BTN_MIDDLE)
+                if "x" in msg and "y" in msg:
+                    x = float(msg.get("x", 0.0))
+                    y = float(msg.get("y", 0.0))
+                    abs_x_val = int(max(0.0, min(1.0, x)) * MAX_ABS)
+                    abs_y_val = int(max(0.0, min(1.0, y)) * MAX_ABS)
+                    emit_event(fd, EV_ABS, ABS_X, abs_x_val)
+                    emit_event(fd, EV_ABS, ABS_Y, abs_y_val)
+                    syn(fd)
                 emit_event(fd, EV_KEY, btn, 0)
                 syn(fd)
 
@@ -143,6 +169,20 @@ def main():
                 key = str(msg.get("key", ""))
                 if key:
                     subprocess.run(["wtype", "-k", key], check=False)
+
+            elif action == "key_combination":
+                modifiers = msg.get("modifiers", [])
+                key = str(msg.get("key", ""))
+                args = ["wtype"]
+                for m in modifiers:
+                    mod_name = "logo" if str(m).lower() in ("super", "win", "logo", "mod") else str(m).lower()
+                    args.extend(["-M", mod_name])
+                if key:
+                    args.extend(["-k", key])
+                for m in reversed(modifiers):
+                    mod_name = "logo" if str(m).lower() in ("super", "win", "logo", "mod") else str(m).lower()
+                    args.extend(["-m", mod_name])
+                subprocess.run(args, check=False)
 
     finally:
         try:

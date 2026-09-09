@@ -6,3 +6,5 @@ server/.env
 *.pid
 *.tmp
 .DS_Store
+__pycache__/
+*.pyc

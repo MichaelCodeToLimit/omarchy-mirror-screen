@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Michael Davies",
   "license": "MIT",
-  "description": "Display mirroring and second-screen extension for iPad with Supabase authentication and Render hosting.",
+  "description": "High-performance display mirroring, second-screen iPad extension, and remote desktop control for Omarchy on Hyprland.",
   "kinds": [
     "bar-widget"
   ],
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "MirrorMarch",
-    "description": "Mirror or extend your display to an iPad or external browser with Supabase authentication.",
+    "description": "Mirror, extend, or remotely control your Omarchy desktop from an iPad or browser with touch support.",
     "category": "Display",
     "defaultSection": "right",
     "allowMultiple": false,
@@ -33,7 +33,8 @@
         "description": "Mirror active display or extend as a separate virtual monitor.",
         "options": [
           "mirror",
-          "extend"
+          "extend",
+          "remote-desktop"
         ],
         "defaultValue": "mirror"
       },
@@ -60,8 +61,8 @@
       {
         "key": "renderUrl",
         "type": "string",
-        "label": "Render Relay URL",
-        "description": "Public URL where your MirrorMarch web service is hosted on Render.",
+        "label": "Relay Server URL",
+        "description": "Public URL where your MirrorMarch web service is hosted.",
         "defaultValue": "https://mirrormarch.onrender.com"
       }
     ]

@@ -196,6 +196,21 @@ case "$CMD" in
   toggle)
     toggle_daemon "$@"
     ;;
+  mirror)
+    stop_daemon || true
+    sleep 0.2
+    start_daemon --mode mirror "$@"
+    ;;
+  extend)
+    stop_daemon || true
+    sleep 0.2
+    start_daemon --mode extend "$@"
+    ;;
+  remote|remotedesktop)
+    stop_daemon || true
+    sleep 0.2
+    start_daemon --mode remote-desktop "$@"
+    ;;
   status)
     print_status
     ;;
@@ -206,7 +221,7 @@ case "$CMD" in
     show_qrcode
     ;;
   *)
-    echo "Usage: mirrormarch {start|stop|restart|toggle|status|open|qrcode} [options]"
+    echo "Usage: mirrormarch {start|stop|restart|toggle|mirror|extend|remote|status|open|qrcode} [options]"
     exit 1
     ;;
 esac

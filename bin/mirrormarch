@@ -58,8 +58,8 @@ start_daemon() {
     extra_args+=("--render-url" "${MIRRORMARCH_RENDER_URL:-https://mirrormarch.onrender.com}")
   fi
 
-  # Run node daemon in background
-  nohup node "$DAEMON_SCRIPT" "${extra_args[@]}" > "$LOG_FILE" 2>&1 &
+  # Run node daemon in background fully detached with setsid
+  nohup setsid node "$DAEMON_SCRIPT" "${extra_args[@]}" </dev/null >> "$LOG_FILE" 2>&1 &
   local new_pid=$!
   echo "$new_pid" > "$PID_FILE"
 

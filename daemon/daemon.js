@@ -325,7 +325,7 @@ function cleanup() {
 
 process.on("SIGINT", () => { console.log("[MirrorMarch] Received SIGINT"); cleanup(); });
 process.on("SIGTERM", () => { console.log("[MirrorMarch] Received SIGTERM"); cleanup(); });
-process.on("SIGHUP", () => { console.log("[MirrorMarch] Received SIGHUP"); cleanup(); });
+process.on("SIGHUP", () => { console.log("[MirrorMarch] Received SIGHUP (ignored)"); });
 
 fs.writeFileSync(PID_FILE, String(process.pid));
 writeState(true);

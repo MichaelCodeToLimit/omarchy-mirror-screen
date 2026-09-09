@@ -15,7 +15,7 @@ BarWidget {
   readonly property string defaultMode: String(setting("mode", "mirror"))
   readonly property int defaultFps: Math.max(15, Math.min(60, Number(setting("fps", 30))))
   readonly property int defaultQuality: Math.max(40, Math.min(95, Number(setting("quality", 65))))
-  readonly property string defaultRenderUrl: String(setting("renderUrl", ""))
+  readonly property string defaultRenderUrl: String(setting("renderUrl", "https://mirrormarch.onrender.com"))
 
   property string selectedMode: defaultMode
   property int selectedFps: defaultFps
@@ -33,6 +33,10 @@ BarWidget {
 
   readonly property string displayGlyph: "󰐱"
   readonly property string monitorGlyph: "󰍹"
+
+  // Sizing for bar slot
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
 
   // ------------------------------------------------------------ state
 
@@ -54,7 +58,7 @@ BarWidget {
   readonly property string tooltipInfo: {
     if (!store.running) return "MirrorMarch: Stopped (click to start)"
     if (store.viewersCount > 0) return "MirrorMarch: Streaming to " + store.viewersCount + " device(s) (" + store.fps + " FPS)"
-    return "MirrorMarch: Ready for iPad (" + store.localUrl + ")"
+    return "MirrorMarch: Ready for iPad (" + (store.renderUrl || store.localUrl) + ")"
   }
 
   function open() {
@@ -69,6 +73,31 @@ BarWidget {
   function toggle() {
     if (popupOpen) close()
     else open()
+  }
+
+  // IPC target for Hyprland keybindings or CLI control
+  IpcHandler {
+    target: "mirrormarch"
+
+    function toggle(): void {
+      store.toggle(root.selectedMode, root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
+    }
+    function start(): void {
+      store.start(root.selectedMode, root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
+    }
+    function stop(): void {
+      store.stop()
+    }
+    function mirror(): void {
+      root.selectedMode = "mirror"
+      if (store.running) store.start("mirror", root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
+    }
+    function extend(): void {
+      root.selectedMode = "extend"
+      if (store.running) store.start("extend", root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
+    }
+    function openPanel(): void { root.open() }
+    function closePanel(): void { root.close() }
   }
 
   // Process for copying URL to clipboard
@@ -96,7 +125,7 @@ BarWidget {
 
     onPressed: function (b) {
       if (b === Qt.RightButton) {
-        // Quick toggle without opening popup
+        // Quick right-click toggle without opening popup
         store.toggle(root.selectedMode, root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
       } else {
         root.toggle()
@@ -163,7 +192,7 @@ BarWidget {
                 text: "MirrorMarch"
                 color: root.foreground
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.bodyLarge
+                font.pixelSize: Style.font.title
                 font.bold: true
               }
               Text {
@@ -182,7 +211,7 @@ BarWidget {
             anchors.verticalCenter: parent.verticalCenter
             height: Style.space(22)
             width: statusRow.implicitWidth + Style.space(14)
-            radius: Style.cornerRadiusSmall
+            radius: Style.cornerRadius
             color: store.running 
               ? (store.viewersCount > 0 ? Qt.rgba(0.06, 0.72, 0.50, 0.15) : Qt.rgba(0.96, 0.62, 0.04, 0.15))
               : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
@@ -208,7 +237,7 @@ BarWidget {
                   ? (store.viewersCount > 0 ? root.success : root.warning)
                   : root.dim
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.captionSmall
+                font.pixelSize: Style.font.caption
                 font.bold: true
               }
             }
@@ -224,8 +253,8 @@ BarWidget {
           height: Style.space(42)
           text: store.running ? "⏹  Stop Streaming" : "▶  Start Mirroring"
           accent: !store.running
-          highlight: store.running
-          fontSize: Style.font.bodyMedium
+          selected: store.running
+          fontSize: Style.font.body
           fontFamily: root.fontFamily
           onClicked: store.toggle(root.selectedMode, root.selectedFps, root.selectedQuality, root.defaultRenderUrl)
         }
@@ -240,7 +269,7 @@ BarWidget {
             text: "DISPLAY MODE"
             color: root.dim
             font.family: root.fontFamily
-            font.pixelSize: Style.font.captionSmall
+            font.pixelSize: Style.font.caption
             font.bold: true
           }
 
@@ -252,7 +281,7 @@ BarWidget {
               width: (parent.width - Style.space(8)) / 2
               height: Style.space(32)
               text: "󰍹 Mirror (DP-1)"
-              highlight: root.selectedMode === "mirror"
+              selected: root.selectedMode === "mirror"
               fontFamily: root.fontFamily
               fontSize: Style.font.bodySmall
               onClicked: {
@@ -265,7 +294,7 @@ BarWidget {
               width: (parent.width - Style.space(8)) / 2
               height: Style.space(32)
               text: "󰐱 Extend (Virtual)"
-              highlight: root.selectedMode === "extend"
+              selected: root.selectedMode === "extend"
               fontFamily: root.fontFamily
               fontSize: Style.font.bodySmall
               onClicked: {
@@ -278,28 +307,35 @@ BarWidget {
 
         // ------------------------------------------------------------ connect info
 
-        PopupCard {
+        Rectangle {
           width: parent.width
+          height: connectCol.implicitHeight + Style.space(16)
+          radius: Style.cornerRadius
+          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
+          border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12)
+          border.width: 1
           visible: store.running
 
           Column {
+            id: connectCol
             anchors.left: parent.left
             anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: Style.space(8)
             spacing: Style.space(6)
-            padding: Style.space(8)
 
             Text {
               text: "IPAD CONNECTION URL"
               color: root.dim
               font.family: root.fontFamily
-              font.pixelSize: Style.font.captionSmall
+              font.pixelSize: Style.font.caption
               font.bold: true
             }
 
             Text {
               text: store.renderUrl || store.localUrl
               color: root.foreground
-              font.family: Style.font.monospace
+              font.family: Style.font.family
               font.pixelSize: Style.font.bodySmall
               elide: Text.ElideMiddle
               width: parent.width
@@ -329,29 +365,33 @@ BarWidget {
 
         // ------------------------------------------------------------ stats info
 
-        PopupCard {
+        Rectangle {
           width: parent.width
+          height: statsRow.implicitHeight + Style.space(16)
+          radius: Style.cornerRadius
+          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
+          border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12)
+          border.width: 1
           visible: store.running && store.viewersCount > 0
 
           Row {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            padding: Style.space(8)
+            id: statsRow
+            anchors.centerIn: parent
             spacing: Style.space(16)
 
             Column {
-              Text { text: "FPS"; color: root.dim; font.pixelSize: Style.font.captionSmall; font.bold: true }
-              Text { text: String(store.fps); color: root.success; font.bold: true; font.pixelSize: Style.font.bodyLarge }
+              Text { text: "FPS"; color: root.dim; font.pixelSize: Style.font.caption; font.bold: true }
+              Text { text: String(store.fps); color: root.success; font.bold: true; font.pixelSize: Style.font.title }
             }
 
             Column {
-              Text { text: "OUTPUT"; color: root.dim; font.pixelSize: Style.font.captionSmall; font.bold: true }
-              Text { text: store.output; color: root.foreground; font.pixelSize: Style.font.bodyMedium }
+              Text { text: "OUTPUT"; color: root.dim; font.pixelSize: Style.font.caption; font.bold: true }
+              Text { text: store.output; color: root.foreground; font.pixelSize: Style.font.body }
             }
 
             Column {
-              Text { text: "RESOLUTION"; color: root.dim; font.pixelSize: Style.font.captionSmall; font.bold: true }
-              Text { text: store.resolution; color: root.foreground; font.pixelSize: Style.font.bodyMedium }
+              Text { text: "RESOLUTION"; color: root.dim; font.pixelSize: Style.font.caption; font.bold: true }
+              Text { text: store.resolution; color: root.foreground; font.pixelSize: Style.font.body }
             }
           }
         }
@@ -366,7 +406,7 @@ BarWidget {
             text: "Space: Toggle • M: Mirror • E: Extend • Q: Close"
             color: root.faint
             font.family: root.fontFamily
-            font.pixelSize: Style.font.captionSmall
+            font.pixelSize: Style.font.caption
           }
         }
       }

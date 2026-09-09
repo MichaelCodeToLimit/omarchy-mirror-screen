@@ -30,54 +30,42 @@
             </svg>
           </div>
           <h1 class="brand-title">MirrorMarch</h1>
-          <p class="brand-subtitle">iPad & Browser Display Mirror for Omarchy Linux</p>
+          <p id="brand-subtitle" class="brand-subtitle">Sign in to connect your display</p>
         </div>
 
         <div id="auth-alert" class="alert hidden"></div>
 
+        <!-- Auth Mode Switcher Tabs -->
+        <div class="auth-tabs">
+          <button type="button" id="tab-signin" class="tab-btn active">Sign In</button>
+          <button type="button" id="tab-signup" class="tab-btn">Create Account</button>
+        </div>
+
         <form id="login-form" class="auth-form">
           <div class="form-group">
-            <label for="input-email">Email or Username</label>
+            <label for="input-email">Email Address</label>
             <div class="input-wrapper">
-              <input type="text" id="input-email" placeholder="user@example.com" required autocomplete="username">
+              <input type="email" id="input-email" placeholder="user@example.com" required autocomplete="email">
             </div>
           </div>
 
           <div class="form-group">
             <label for="input-password">Password</label>
             <div class="input-wrapper">
-              <input type="password" id="input-password" placeholder="••••••••" required autocomplete="current-password">
+              <input type="password" id="input-password" placeholder="••••••••" required autocomplete="current-password" minlength="6">
             </div>
           </div>
 
           <button type="submit" id="btn-login" class="btn-primary">
-            <span class="btn-text">Connect to Display</span>
+            <span id="btn-login-text" class="btn-text">Connect to Display</span>
             <span class="btn-spinner hidden"></span>
           </button>
         </form>
 
         <div class="auth-footer">
-          <button id="btn-toggle-config" class="btn-text-link">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            Supabase Project Settings
+          <button type="button" id="btn-toggle-auth" class="btn-text-link">
+            Don't have an account? <span class="link-highlight">Create one</span>
           </button>
-          <button id="btn-quick-connect" class="btn-text-link">Bypass Auth (Local / Direct)</button>
-        </div>
-
-        <!-- Collapsible Supabase Config -->
-        <div id="supabase-config-drawer" class="config-drawer hidden">
-          <div class="config-divider"></div>
-          <h3 class="config-title">Supabase Credentials</h3>
-          <p class="config-hint">Stored securely in your device browser for seamless auto-reconnects.</p>
-          <div class="form-group">
-            <label for="cfg-supabase-url">Project URL</label>
-            <input type="text" id="cfg-supabase-url" placeholder="https://your-ref.supabase.co">
-          </div>
-          <div class="form-group">
-            <label for="cfg-supabase-anon">Anon Public Key</label>
-            <input type="password" id="cfg-supabase-anon" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6...">
-          </div>
-          <button type="button" id="btn-save-config" class="btn-secondary">Save Settings</button>
         </div>
       </div>
     </div>

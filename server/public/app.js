@@ -7,12 +7,11 @@
   const inputPassword = document.getElementById('input-password');
   const authAlert = document.getElementById('auth-alert');
   const btnLogin = document.getElementById('btn-login');
-  const btnQuickConnect = document.getElementById('btn-quick-connect');
-  const btnToggleConfig = document.getElementById('btn-toggle-config');
-  const configDrawer = document.getElementById('supabase-config-drawer');
-  const cfgSupabaseUrl = document.getElementById('cfg-supabase-url');
-  const cfgSupabaseAnon = document.getElementById('cfg-supabase-anon');
-  const btnSaveConfig = document.getElementById('btn-save-config');
+  const btnLoginText = document.getElementById('btn-login-text');
+  const brandSubtitle = document.getElementById('brand-subtitle');
+  const tabSignin = document.getElementById('tab-signin');
+  const tabSignup = document.getElementById('tab-signup');
+  const btnToggleAuth = document.getElementById('btn-toggle-auth');
 
   const canvas = document.getElementById('display-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -36,6 +35,7 @@
   let serverConfig = null;
   let ws = null;
   let authToken = null;
+  let authMode = 'signin'; // 'signin' or 'signup'
   let hostConnected = false;
   let touchMode = 'direct'; // 'direct' or 'trackpad'
   let streamMeta = { width: 1920, height: 1080, mode: 'mirror' };
@@ -66,14 +66,9 @@
       serverConfig = { authRequired: false };
     }
 
-    // Load custom Supabase credentials from localStorage or server config
-    const savedUrl = localStorage.getItem('mm_supabase_url') || serverConfig.supabaseUrl || '';
-    const savedAnon = localStorage.getItem('mm_supabase_anon') || serverConfig.supabaseAnonKey || '';
-    
-    cfgSupabaseUrl.value = savedUrl;
-    cfgSupabaseAnon.value = savedAnon;
-
-    initSupabaseClient(savedUrl, savedAnon);
+    const url = serverConfig.supabaseUrl || '';
+    const key = serverConfig.supabaseAnonKey || '';
+    initSupabaseClient(url, key);
 
     // Check for existing session
     if (supabase) {
@@ -89,17 +84,13 @@
         console.warn('Session check error:', e);
       }
     }
-
-    if (!serverConfig.authRequired) {
-      btnQuickConnect.classList.remove('hidden');
-    }
   }
 
   function initSupabaseClient(url, key) {
     if (url && key && window.supabase) {
       try {
         supabase = window.supabase.createClient(url, key);
-        console.log('[MirrorMarch] Supabase client initialized');
+        console.log('[MirrorMarch] Supabase client initialized with server config');
       } catch (e) {
         console.error('Failed to init Supabase:', e);
       }
@@ -116,26 +107,33 @@
     authAlert.classList.add('hidden');
   }
 
-  // Toggle Config Drawer
-  btnToggleConfig.addEventListener('click', () => {
-    configDrawer.classList.toggle('hidden');
-  });
+  // Switch between Sign In and Create Account
+  function switchAuthMode(mode) {
+    authMode = mode;
+    hideAlert();
 
-  btnSaveConfig.addEventListener('click', () => {
-    const url = cfgSupabaseUrl.value.trim();
-    const key = cfgSupabaseAnon.value.trim();
-    if (!url || !key) {
-      showAlert('Please enter both Supabase URL and Anon Key');
-      return;
+    if (mode === 'signup') {
+      tabSignup.classList.add('active');
+      tabSignin.classList.remove('active');
+      brandSubtitle.textContent = 'Create an account to access your display';
+      btnLoginText.textContent = 'Create Account & Connect';
+      btnToggleAuth.innerHTML = 'Already have an account? <span class="link-highlight">Sign In</span>';
+    } else {
+      tabSignin.classList.add('active');
+      tabSignup.classList.remove('active');
+      brandSubtitle.textContent = 'Sign in to connect your display';
+      btnLoginText.textContent = 'Connect to Display';
+      btnToggleAuth.innerHTML = 'Don\'t have an account? <span class="link-highlight">Create one</span>';
     }
-    localStorage.setItem('mm_supabase_url', url);
-    localStorage.setItem('mm_supabase_anon', key);
-    initSupabaseClient(url, key);
-    showAlert('Supabase settings saved!', 'info');
-    configDrawer.classList.add('hidden');
+  }
+
+  tabSignin.addEventListener('click', () => switchAuthMode('signin'));
+  tabSignup.addEventListener('click', () => switchAuthMode('signup'));
+  btnToggleAuth.addEventListener('click', () => {
+    switchAuthMode(authMode === 'signin' ? 'signup' : 'signin');
   });
 
-  // Login Submit
+  // Form Submit: Sign In or Sign Up
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideAlert();
@@ -144,46 +142,67 @@
     const password = inputPassword.value;
 
     if (!supabase) {
-      // If Supabase credentials are missing, warn the user
-      const url = cfgSupabaseUrl.value.trim();
-      const key = cfgSupabaseAnon.value.trim();
-      if (!url || !key) {
-        showAlert('Supabase not configured. Click "Supabase Project Settings" below to enter credentials.');
-        configDrawer.classList.remove('hidden');
-        return;
-      }
-      initSupabaseClient(url, key);
+      showAlert('Supabase is still connecting. Please try again in a few seconds.');
+      return;
     }
 
     btnLogin.disabled = true;
-    btnLogin.querySelector('.btn-text').textContent = 'Authenticating...';
+    btnLoginText.textContent = authMode === 'signup' ? 'Creating Account...' : 'Authenticating...';
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password
-      });
+    if (authMode === 'signup') {
+      // Create Account (Sign Up)
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: email,
+          password: password
+        });
 
-      if (error) {
-        showAlert(error.message);
+        if (error) {
+          showAlert(error.message);
+          btnLogin.disabled = false;
+          btnLoginText.textContent = 'Create Account & Connect';
+          return;
+        }
+
+        if (data.session) {
+          // Instant sign in
+          authToken = data.session.access_token;
+          startViewer();
+        } else if (data.user) {
+          // Email confirmation required by Supabase project settings
+          showAlert('Account created! Please check your email to confirm, then Sign In.', 'info');
+          switchAuthMode('signin');
+          btnLogin.disabled = false;
+          btnLoginText.textContent = 'Connect to Display';
+        }
+      } catch (err) {
+        showAlert(err.message || 'Signup failed');
         btnLogin.disabled = false;
-        btnLogin.querySelector('.btn-text').textContent = 'Connect to Display';
-        return;
+        btnLoginText.textContent = 'Create Account & Connect';
       }
+    } else {
+      // Sign In
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
 
-      authToken = data.session.access_token;
-      startViewer();
-    } catch (err) {
-      showAlert(err.message || 'Login failed');
-      btnLogin.disabled = false;
-      btnLogin.querySelector('.btn-text').textContent = 'Connect to Display';
+        if (error) {
+          showAlert(error.message);
+          btnLogin.disabled = false;
+          btnLoginText.textContent = 'Connect to Display';
+          return;
+        }
+
+        authToken = data.session.access_token;
+        startViewer();
+      } catch (err) {
+        showAlert(err.message || 'Login failed');
+        btnLogin.disabled = false;
+        btnLoginText.textContent = 'Connect to Display';
+      }
     }
-  });
-
-  // Quick Connect / Bypass Auth
-  btnQuickConnect.addEventListener('click', () => {
-    authToken = 'guest-token';
-    startViewer();
   });
 
   // Switch to Viewer View & connect WebSocket
@@ -242,7 +261,6 @@
       stopPing();
 
       if (event.code === 4001) {
-        // Unauthorized
         alert('Authentication expired. Please sign in again.');
         logout();
         return;
@@ -291,10 +309,8 @@
       const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
       const imageBitmap = await createImageBitmap(blob);
 
-      // Render frame smoothly
       renderFrame(imageBitmap);
 
-      // Calculate FPS
       framesThisSecond++;
       const now = performance.now();
       if (now - lastFpsTime >= 1000) {
@@ -320,7 +336,6 @@
     const bWidth = bitmap.width;
     const bHeight = bitmap.height;
 
-    // Aspect ratio letterboxing
     const scale = Math.min(cWidth / bWidth, cHeight / bHeight);
     const renderW = bWidth * scale;
     const renderH = bHeight * scale;
@@ -331,7 +346,6 @@
     ctx.fillRect(0, 0, cWidth, cHeight);
     ctx.drawImage(bitmap, offsetX, offsetY, renderW, renderH);
 
-    // Save image bounds for touch coordinate translation
     canvas._imageBounds = {
       offsetX: offsetX / window.devicePixelRatio,
       offsetY: offsetY / window.devicePixelRatio,
@@ -401,7 +415,6 @@
       if (coords) {
         sendInput({ action: 'move', x: coords.x, y: coords.y });
         
-        // Long press for right-click
         longPressTimer = setTimeout(() => {
           if (!touchMoved && isPointerDown) {
             sendInput({ action: 'click', button: 'right', x: coords.x, y: coords.y });
@@ -430,7 +443,6 @@
         sendInput({ action: 'move', x: coords.x, y: coords.y });
       }
     } else {
-      // Trackpad mode: relative movement
       const dx = (e.clientX - touchStartX) / window.innerWidth;
       const dy = (e.clientY - touchStartY) / window.innerHeight;
       sendInput({ action: 'rel_move', dx: dx * 2.0, dy: dy * 2.0 });
@@ -449,7 +461,6 @@
     const duration = performance.now() - touchStartTime;
 
     if (!touchMoved && duration < 350) {
-      // Normal Left Click
       if (touchMode === 'direct') {
         const coords = getNormalizedCoordinates(e.clientX, e.clientY);
         if (coords) {
@@ -461,13 +472,11 @@
     }
   });
 
-  // Two-finger gestures / Wheel
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     sendInput({ action: 'scroll', dx: e.deltaX, dy: e.deltaY });
   }, { passive: false });
 
-  // Virtual Keyboard Input for iPad
   btnKeyboard.addEventListener('click', (e) => {
     e.stopPropagation();
     virtualInput.focus();
@@ -486,14 +495,12 @@
     virtualInput.value = '';
   });
 
-  // Mode Toggle (Direct Touch vs Trackpad)
   btnModeToggle.addEventListener('click', (e) => {
     e.stopPropagation();
     touchMode = touchMode === 'direct' ? 'trackpad' : 'direct';
     modeText.textContent = touchMode === 'direct' ? 'Direct Touch' : 'Trackpad';
   });
 
-  // Fullscreen Toggle
   btnFullscreen.addEventListener('click', (e) => {
     e.stopPropagation();
     if (!document.fullscreenElement) {
@@ -507,7 +514,6 @@
     }
   });
 
-  // Logout
   btnLogout.addEventListener('click', (e) => {
     e.stopPropagation();
     logout();
@@ -525,10 +531,9 @@
     viewerView.classList.add('hidden');
     authView.classList.remove('hidden');
     btnLogin.disabled = false;
-    btnLogin.querySelector('.btn-text').textContent = 'Connect to Display';
+    btnLoginText.textContent = 'Connect to Display';
   }
 
-  // HUD Auto-hide
   function startHudTimer() {
     clearTimeout(hudHideTimeout);
     hudHideTimeout = setTimeout(() => {

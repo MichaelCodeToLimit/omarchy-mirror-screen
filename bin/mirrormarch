@@ -44,10 +44,22 @@ start_daemon() {
   fi
 
   echo "Starting MirrorMarch daemon..."
-  mkdir -p "$STATE_DIR"
-  
+  # Check if --render-url is provided in arguments
+  local has_render_url=false
+  for arg in "$@"; do
+    if [[ "$arg" == "--render-url" ]]; then
+      has_render_url=true
+      break
+    fi
+  done
+
+  local extra_args=("$@")
+  if [[ "$has_render_url" == "false" ]]; then
+    extra_args+=("--render-url" "${MIRRORMARCH_RENDER_URL:-https://mirrormarch.onrender.com}")
+  fi
+
   # Run node daemon in background
-  nohup node "$DAEMON_SCRIPT" "$@" > "$LOG_FILE" 2>&1 &
+  nohup node "$DAEMON_SCRIPT" "${extra_args[@]}" > "$LOG_FILE" 2>&1 &
   local new_pid=$!
   echo "$new_pid" > "$PID_FILE"
 

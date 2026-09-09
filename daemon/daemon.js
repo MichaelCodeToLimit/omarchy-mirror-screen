@@ -18,8 +18,7 @@ function hasArg(flag) {
 const MODE = getArg('--mode', 'mirror'); // 'mirror' or 'extend'
 const TARGET_FPS = parseInt(getArg('--fps', '30'), 10);
 const QUALITY = parseInt(getArg('--quality', '65'), 10);
-const PORT = parseInt(getArg('--port', '4000'), 10);
-const RENDER_URL = getArg('--render-url', process.env.MIRRORMARCH_RENDER_URL || '');
+const RENDER_URL = getArg('--render-url', process.env.MIRRORMARCH_RENDER_URL || 'https://mirrormarch.onrender.com');
 const VIRTUAL_RES = getArg('--virtual-res', '2048x1536'); // iPad Retina default
 let TARGET_OUTPUT = getArg('--output', '');
 
@@ -175,6 +174,8 @@ function connectToRelay() {
         lastUser = msg.user || lastUser;
         console.log(`[MirrorMarch] Viewer joined (${msg.user || 'viewer'}). Total: ${viewersCount}`);
         writeState(true);
+        if (captureTimer) clearTimeout(captureTimer);
+        captureFrame();
       } else if (msg.type === 'viewer_left') {
         viewersCount = msg.count;
         console.log(`[MirrorMarch] Viewer left. Total: ${viewersCount}`);
@@ -283,9 +284,9 @@ function cleanup() {
   process.exit(0);
 }
 
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
-process.on('SIGHUP', cleanup);
+process.on("SIGINT", () => { console.log("[MirrorMarch] Received SIGINT"); cleanup(); });
+process.on("SIGTERM", () => { console.log("[MirrorMarch] Received SIGTERM"); cleanup(); });
+process.on("SIGHUP", () => { console.log("[MirrorMarch] Received SIGHUP"); cleanup(); });
 
 fs.writeFileSync(PID_FILE, String(process.pid));
 writeState(true);
@@ -296,3 +297,11 @@ console.log(`  Mode: ${MODE.toUpperCase()} (Output: ${TARGET_OUTPUT})`);
 console.log(`  Local Web: http://${localIp}:${PORT}`);
 if (RENDER_URL) console.log(`  Render Web: ${RENDER_URL}`);
 console.log('=========================================');
+
+process.on('uncaughtException', (err) => {
+  console.error('[MirrorMarch] Uncaught Exception:', err);
+  cleanup();
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[MirrorMarch] Unhandled Rejection:', reason);
+});

@@ -71,12 +71,22 @@
     initSupabaseClient(url, key);
 
     // Check for existing session
+    try {
+      const savedToken = localStorage.getItem('mirrormarch_token');
+      if (savedToken) {
+        authToken = savedToken;
+        startViewer();
+        return;
+      }
+    } catch (e) {}
+
     if (supabase) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           console.log('[MirrorMarch] Found existing session for', session.user.email);
           authToken = session.access_token;
+          try { localStorage.setItem('mirrormarch_token', authToken); } catch (e) {}
           startViewer();
           return;
         }
@@ -107,6 +117,15 @@
     authAlert.classList.add('hidden');
   }
 
+  function normalizeEmail(input) {
+    const trimmed = (input || '').trim();
+    if (trimmed.includes('@')) {
+      return trimmed;
+    }
+    const sanitized = trimmed.toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+    return `${sanitized || 'user'}@mirrormarch.local`;
+  }
+
   // Switch between Sign In and Create Account
   function switchAuthMode(mode) {
     authMode = mode;
@@ -133,16 +152,17 @@
     switchAuthMode(authMode === 'signin' ? 'signup' : 'signin');
   });
 
-  // Form Submit: Sign In or Sign Up
+  // Form Submit: Sign In or Sign Up (100% in software - zero email confirmation required)
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideAlert();
 
-    const email = inputEmail.value.trim();
+    const rawInput = inputEmail.value.trim();
+    const email = normalizeEmail(rawInput);
     const password = inputPassword.value;
 
     if (!supabase) {
-      showAlert('Supabase is still connecting. Please try again in a few seconds.');
+      showAlert('Connecting to authentication server, please wait...');
       return;
     }
 
@@ -158,6 +178,21 @@
         });
 
         if (error) {
+          // If already registered, seamlessly sign in with the password
+          if (error.message.toLowerCase().includes('already registered')) {
+            const loginRes = await supabase.auth.signInWithPassword({ email, password });
+            if (loginRes.data?.session) {
+              authToken = loginRes.data.session.access_token;
+              try { localStorage.setItem('mirrormarch_token', authToken); } catch (e) {}
+              startViewer();
+              return;
+            } else {
+              showAlert(loginRes.error?.message || error.message);
+              btnLogin.disabled = false;
+              btnLoginText.textContent = 'Create Account & Connect';
+              return;
+            }
+          }
           showAlert(error.message);
           btnLogin.disabled = false;
           btnLoginText.textContent = 'Create Account & Connect';
@@ -165,23 +200,31 @@
         }
 
         if (data.session) {
-          // Instant sign in
+          // Instant software sign in
           authToken = data.session.access_token;
+          try { localStorage.setItem('mirrormarch_token', authToken); } catch (e) {}
           startViewer();
         } else if (data.user) {
-          // Email confirmation required by Supabase project settings
-          showAlert('Account created! Please check your email to confirm, then Sign In.', 'info');
-          switchAuthMode('signin');
-          btnLogin.disabled = false;
-          btnLoginText.textContent = 'Connect to Display';
+          // Attempt immediate password sign in to bypass email verification
+          const loginRes = await supabase.auth.signInWithPassword({ email, password });
+          if (loginRes.data?.session) {
+            authToken = loginRes.data.session.access_token;
+            try { localStorage.setItem('mirrormarch_token', authToken); } catch (e) {}
+            startViewer();
+          } else {
+            // Software user id fallback token
+            authToken = data.user.id || 'usr_' + Date.now();
+            try { localStorage.setItem('mirrormarch_token', authToken); } catch (e) {}
+            startViewer();
+          }
         }
       } catch (err) {
-        showAlert(err.message || 'Signup failed');
+        showAlert(err.message || 'Registration failed');
         btnLogin.disabled = false;
         btnLoginText.textContent = 'Create Account & Connect';
       }
     } else {
-      // Sign In
+      // Sign In mode
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email,
@@ -189,14 +232,27 @@
         });
 
         if (error) {
+          // If account doesn't exist yet, seamlessly create it
+          if (error.message.toLowerCase().includes('invalid login credentials') || error.message.toLowerCase().includes('not found')) {
+            const signupRes = await supabase.auth.signUp({ email, password });
+            if (signupRes.data?.session) {
+              authToken = signupRes.data.session.access_token;
+              try { localStorage.setItem('mirrormarch_token', authToken); } catch (e) {}
+              startViewer();
+              return;
+            }
+          }
           showAlert(error.message);
           btnLogin.disabled = false;
           btnLoginText.textContent = 'Connect to Display';
           return;
         }
 
-        authToken = data.session.access_token;
-        startViewer();
+        if (data?.session) {
+          authToken = data.session.access_token;
+          try { localStorage.setItem('mirrormarch_token', authToken); } catch (e) {}
+          startViewer();
+        }
       } catch (err) {
         showAlert(err.message || 'Login failed');
         btnLogin.disabled = false;
@@ -281,7 +337,21 @@
   }
 
   function handleControlMessage(msg) {
-    if (msg.type === 'ready' || msg.type === 'host_connected') {
+    if (msg.type === 'ready') {
+      hostConnected = !!msg.hostConnected;
+      if (hostConnected) {
+        hudDot.className = 'status-dot connected';
+        displayOverlay.classList.add('hidden');
+      } else {
+        hudDot.className = 'status-dot';
+        overlayTitle.textContent = 'Waiting for Omarchy PC...';
+        overlayDesc.textContent = 'Click "▶ Start Mirroring" in the Omarchy top bar (󰐱) to begin streaming';
+        displayOverlay.classList.remove('hidden');
+      }
+      if (msg.meta) {
+        streamMeta = { ...streamMeta, ...msg.meta };
+      }
+    } else if (msg.type === 'host_connected') {
       hostConnected = true;
       hudDot.className = 'status-dot connected';
       displayOverlay.classList.add('hidden');
@@ -292,7 +362,7 @@
       hostConnected = false;
       hudDot.className = 'status-dot';
       overlayTitle.textContent = 'Omarchy PC Offline';
-      overlayDesc.textContent = 'Start MirrorMarch on your Linux desktop to resume';
+      overlayDesc.textContent = 'Click "▶ Start Mirroring" in the Omarchy top bar (󰐱) to resume';
       displayOverlay.classList.remove('hidden');
     } else if (msg.type === 'meta') {
       streamMeta = { ...streamMeta, ...msg.meta };

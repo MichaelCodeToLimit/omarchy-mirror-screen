@@ -23,7 +23,7 @@
       "fps": 30,
       "quality": 65,
       "port": 4000,
-      "renderUrl": ""
+      "renderUrl": "https://mirrormarch.onrender.com"
     },
     "schema": [
       {
@@ -62,7 +62,7 @@
         "type": "string",
         "label": "Render Relay URL",
         "description": "Public URL where your MirrorMarch web service is hosted on Render.",
-        "defaultValue": ""
+        "defaultValue": "https://mirrormarch.onrender.com"
       }
     ]
   }
